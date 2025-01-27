@@ -1,0 +1,24 @@
+I - Me permita registrar os dias em que eu treinei
+II - Diga a quantas semanas eu tenho treinado determinada parte 
+III - Me dig a minha rotina de treinos para o dia que eu disser
+IV - Menu de opções:
+    a. Nº de treinos na semanas
+    b. Lista com os treinos e frequencia esperada semanal
+V - Frequência (%) atingida em relação ao total, no último mês
+
+Feito:
+- Criar usuário
+- Deletar usuário
+- Página de comandos
+- Poder add e excluir treinos
+- Sistema de senha
+    - (atualizar o negocio de criar usuario)
+    - (adaptar a maneira como sao salvos cada post, novo atributo "senha")
+- Sistema de login simples
+
+A fazer:
+- Aumentar o tempo de uso conforme os dias
+
+/// Para rodar:
+- python .\app\bot.py
+- uvicorn app.app:app --reload
