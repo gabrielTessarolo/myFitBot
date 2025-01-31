@@ -85,8 +85,12 @@ def delete_post(post_id: int):
     save_data(filtered_data)
     return {"message": f"User with ID {post_id} deleted"}
 
-if __name__ == "__main__":
-    run_process("./", run)
+import uvicorn
+def runFastApi():
     uvicorn.run(app, host="127.0.0.1", port=8000)
+
+if __name__ == "__main__":
+    # run_process("./", run)
+    runFastApi()
     
     

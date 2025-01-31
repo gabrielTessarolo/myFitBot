@@ -1,8 +1,10 @@
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackContext, CallbackQueryHandler
 from apscheduler.schedulers.background import BackgroundScheduler
+from threading import Thread
 
 from request import getInfo, createUser, deleteUser, editUser
+from app import runFastApi
 
 # Define globalmente o scheduler, pra rodar de forma independente
 scheduler = BackgroundScheduler()
@@ -101,8 +103,11 @@ async def handleMsg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if infoTreino=="error":
             await send("Operação cancelada (informações insuficientes).")
         else:
-            editUser(context.user_data.get("selectedUser"), mode=context.user_data["awaiting_editTrainingInfo"], novoTreino=infoTreino)
-            await send(f"O *treino {context.user_data["awaiting_editTrainingInfo"][-1]}* foi alterado.")
+            try:
+                editUser(context.user_data.get("selectedUser"), mode=context.user_data["awaiting_editTrainingInfo"], novoTreino=infoTreino)
+                await send(f"O *treino {context.user_data["awaiting_editTrainingInfo"][-1]}* foi alterado.")
+            except:
+                await send(f"Esse treino já havia sido deletado.")
         context.user_data["awaiting_editTrainingInfo"] = False
 
 # Função para manipular as ações dos botões
@@ -113,14 +118,17 @@ async def handleButton(update: Update, context: CallbackContext):
 
     if action == "addTreino" or action[:-1] == "treino_":
         # await query.message.reply_text("Digite:\n- O nome do treino:\n- Que dia será feito:\n- Os exercícios, no formato:\n_(4x12) Supino reto\n(3x10) Barra fixa [...]_", parse_mode="Markdown")
-        await query.message.reply_text("Digite, por exemplo:\n- Treino de braço:\n- Quarta-feira:\n_(4x12) Rosca Scott\n(3x10) Tríceps na polia alta [...]_", parse_mode="Markdown")        
+        await query.message.reply_text("Digite, por exemplo:\nTreino de braço\nQuarta-feira\n_(4x12) Rosca Scott\n(3x10) Tríceps na polia alta [...]_", parse_mode="Markdown")        
         if action == "addTreino":
             context.user_data["awaiting_addTrainingInfo"] = True
         else:
             context.user_data["awaiting_editTrainingInfo"] = action
     elif action[:-1] == "delTreino_":
-        editUser(context.user_data.get("selectedUser"), mode=action)
-        await query.message.reply_text(f"O *treino {action[-1]}* foi excluído.", parse_mode="Markdown")
+        try:
+            editUser(context.user_data.get("selectedUser"), mode=action)
+            await query.message.reply_text(f"O *treino {action[-1]}* foi excluído.", parse_mode="Markdown")
+        except:
+            await query.message.reply_text(f"Esse treino já havia sido deletado.")
 
 
 async def showUserInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -184,12 +192,17 @@ async def login(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data["awaiting_login"] = True
 
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    from math import ceil, floor
+    from math import ceil, floor 
     send = createSendFunc(update)
-    actualUser = getActualUser(context)
+    actualUser = {}
+    try:
+        actualUser = getActualUser(context)
+    except:
+        await send("Você não está logado.")
+        return
 
     diasTotal, diasTreinados, metaSemanal = len(actualUser["calendar"]), actualUser["calendar"].count(1), len(actualUser["listWs"])
-    diasEsperados = ceil(diasTotal/7) * metaSemanal - (metaSemanal-diasTotal%7) # Contando com correção para semanas incompletas.
+    diasEsperados = ceil(diasTotal/7) * metaSemanal - [0, (metaSemanal-diasTotal%7)][diasTotal%7<metaSemanal] # Contando com correção para semanas incompletas.
     if diasEsperados <= 0: diasEsperados = 1
 
     await send(f"Seu rendimento atual é de:")
@@ -207,12 +220,12 @@ async def markAsComplete(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await update.message.reply_text("Você não está em uma conta válida.")
 
 # Função para forçar a pulada de dia (desativado)
-# async def forceDay(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-#     updateUsersPeriod()
+async def forceDay():
+    updateUsersPeriod()
 
 # Função principal
 def main():
-    app = Application.builder().token("7679308466:AAHiMaWJfmHjGkgo-UuMfsH1ywDmjZjCQq8").build()
+    app = Application.builder().token("###").build()
 
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handleMsg))
     app.add_handler(CallbackQueryHandler(handleButton))
@@ -228,7 +241,7 @@ def main():
     app.add_handler(CommandHandler("mark", markAsComplete))
 
     # Função que chamará a atualização do período dos usuários sempre à meia-noite
-    scheduler.add_job(updateUsersPeriod, 'cron', hour=0, minute=0)
+    scheduler.add_job(updateUsersPeriod, 'cron', hour=0, minute=2)
     scheduler.start()
 
     print("Bot Rodando.")
@@ -242,4 +255,6 @@ from watchgod import run_process
 
 # Sempre que houver modificação em algum arquivo do diretório app, a função main será rodada novamente
 if __name__ == "__main__":
+    fastapi_thread = Thread(target=runFastApi)
+    fastapi_thread.start()
     run_process("./", main)

@@ -16,7 +16,7 @@ def getMaxID():
 # Fazer uma requisição POST
 def createUser(name, pw):
     new_post = {"id": getMaxID()+1, "username": name, "password": pw,
-                "period": 0,  "calendar": [0], "listWs": []}
+                "period": 1,  "calendar": [0], "listWs": []}
     response = requests.post(url, json=new_post)
     return new_post['id']
 
