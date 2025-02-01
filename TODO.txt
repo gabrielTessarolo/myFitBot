@@ -19,6 +19,13 @@ Feito:
 A fazer:
 - Aumentar o tempo de uso conforme os dias
 
+Editar peso de exercício:
+- Ter um botão pra cada treino, "mudar peso". Abre um keyboard diferentao la, por ele a pessoa especifica o exercicio e o novo peso.
+
+
+
 /// Para rodar:
 - python .\app\bot.py
 - uvicorn app.app:app --reload
+
+

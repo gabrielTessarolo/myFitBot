@@ -1,4 +1,4 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Message
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackContext, CallbackQueryHandler
 from apscheduler.schedulers.background import BackgroundScheduler
 from threading import Thread
@@ -14,9 +14,16 @@ createSendFunc = lambda update: (lambda string, keyboard=[]: update.message.repl
 
 getActualUser = lambda context: [x for x in getInfo() if x['id']==context.user_data.get("selectedUser")][0]
 
+def resetAwaits(context):
+    for i in context.user_data.keys():
+        if i[:9] == "awaiting_":
+            # i = False
+            print(i, context.user_data.get(i))
+
 def updateUsersPeriod():
     for user in getInfo():
         editUser(user['id'], mode="attPeriod")
+        # editUser(user['id'], mode="super")
 
 def updateUserCalendar(user_id):
     editUser(user_id, mode="attCalendar")
@@ -25,6 +32,7 @@ def updateUserCalendar(user_id):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text('Olá. Estou aqui para te ajudar a controlar e visualizar seus treinos.\nUse /help para ver meus comandos.')
     await update.message.reply_text('Utilize /newuser para criar um novo usuário, ou logue utilizando /login.')
+    resetAwaits(context)
 
 # Função para responder ao comando /newuser
 async def addUser(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -38,7 +46,11 @@ async def handleMsg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     async def pegarInfoTreino():
         data = update.message.text.split("\n")
         if len(data)<3: return "error"
-        return {"day": data[1], "name": data[0], "exercises": data[2:]}
+        addedExs = data[2:]
+        for i in range(len(addedExs)):
+            addedExs[i] = [addedExs[i], [0]]
+
+        return {"day": data[1], "name": data[0], "exercises": addedExs}
 
     # Quando o esperado for o nome do novo usuário
     if context.user_data.get("awaiting_name"):
@@ -110,6 +122,18 @@ async def handleMsg(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
                 await send(f"Esse treino já havia sido deletado.")
         context.user_data["awaiting_editTrainingInfo"] = False
 
+    
+    # Quando o esperado for a nova carga editada
+    elif context.user_data.get("awaiting_newLoad").count(0)==0:
+        newLoad = update.message.text
+        try:
+            newLoad = int(newLoad)
+            editUser(context.user_data.get("selectedUser"), mode=f"editLoadT_{context.user_data.get("awaiting_newLoad")[0]}Ex_{context.user_data.get("awaiting_newLoad")[1]}", load=newLoad)
+            await send("Carga atualizada.")
+        except:
+            await send("Operação cancelada. Digite uma carga inteira válida.")
+        context.user_data["awaiting_newLoad"] = [0,0]
+
 # Função para manipular as ações dos botões
 async def handleButton(update: Update, context: CallbackContext):
     query = update.callback_query
@@ -123,6 +147,7 @@ async def handleButton(update: Update, context: CallbackContext):
             context.user_data["awaiting_addTrainingInfo"] = True
         else:
             context.user_data["awaiting_editTrainingInfo"] = action
+
     elif action[:-1] == "delTreino_":
         try:
             editUser(context.user_data.get("selectedUser"), mode=action)
@@ -130,6 +155,29 @@ async def handleButton(update: Update, context: CallbackContext):
         except:
             await query.message.reply_text(f"Esse treino já havia sido deletado.")
 
+    elif action[:-1] == "editLoadTreino_":
+        try:
+            exercises = [ex[0] for ex in getActualUser(context)['listWs'][int(action[-1])-1]['exercises']]
+            exOptions = []
+            for i in range(1, len(exercises)+1):
+                if (i-1)%3 == 0:
+                    exOptions.append([InlineKeyboardButton(f"{exercises[i-1]}", callback_data=f"changeLoadT_{action[-1]}Ex_{i}")])
+                else:
+                    exOptions[-1].append(InlineKeyboardButton(f"{exercises[i-1]}", callback_data=f"changeLoadT_{action[-1]}Ex_{i}"))
+            await query.message.reply_text(f"Selecione o exercício que terá a carga alterada:", reply_markup=InlineKeyboardMarkup(exOptions))
+        except:
+            await query.message.reply_text(f"Esse treino já havia sido deletado.")
+
+    if action[:12] == "changeLoadT_":
+        try:
+            exercises = [ex for ex in getActualUser(context)['listWs'][int(action[12])-1]['exercises']]
+            if len(exercises[int(action[-1])-1][1])>1:
+                await query.message.reply_text(f"Seu histórico para {exercises[int(action[-1])-1][0]}:"+
+                                            f"\n{' -> '.join([f'_[ {x}kg ]_' for x in exercises[int(action[-1])-1][1] if x!=0])}\n", parse_mode="Markdown")
+            await query.message.reply_text("Digite a nova carga, em quilos:")
+            context.user_data["awaiting_newLoad"] = [int(action[12]), int(action[-1])]
+        except:
+            await query.message.reply_text(f"Esse treino já havia sido deletado.")
 
 async def showUserInfo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f'Informações:\n{str(getInfo())}')
@@ -162,11 +210,12 @@ async def openTreinos(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         # Define o teclado de botões para cada treino (botão de editar)
         trainingKeyboard = [
             [
-                InlineKeyboardButton(f"Editar", callback_data=f"treino_{i+1}"), InlineKeyboardButton("Deletar", callback_data=f"delTreino_{i+1}")
+                 InlineKeyboardButton("Deletar", callback_data=f"delTreino_{i+1}"), InlineKeyboardButton(f"Editar", callback_data=f"treino_{i+1}"), InlineKeyboardButton(f"Alterar\nCargas", callback_data=f"editLoadTreino_{i+1}"),
             ]
         ]
         await send(f"*{listaTreinos[i]['day'].upper()} - {listaTreinos[i]['name']}*\n"+
-              "\n".join([f'- {ex}' for ex in listaTreinos[i]['exercises']]), trainingKeyboard)
+            "\n".join([(f'- {ex[0]}{[f"  _[ {ex[1][-1]}kg ]_",""][len(ex[1])==1]}') for ex in listaTreinos[i]['exercises']]), trainingKeyboard)
+        
 
 async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     commandList = {

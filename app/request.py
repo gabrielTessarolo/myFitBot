@@ -21,7 +21,7 @@ def createUser(name, pw):
     return new_post['id']
 
 # Fazer uma requisição PUT
-def editUser(user_id, mode="addTreino", novoTreino={"day":"", "name":"", "exercises":[]}):
+def editUser(user_id, mode="addTreino", novoTreino={"day":"", "name":"", "exercises":[]}, load=0):
     user = [post for post in getInfo() if post['id']==user_id][0] # Recupera o usuário que deve ser alterado na API a partir do selectedUser
     if mode=="attPeriod":
         # Atualiza diariamente o atributo período dos usuários.
@@ -31,14 +31,22 @@ def editUser(user_id, mode="addTreino", novoTreino={"day":"", "name":"", "exerci
             user["calendar"].append(0)
         else:
             user["calendar"] = user["calendar"][1:].extend(0)
+
     elif mode=="attCalendar":
         user["calendar"][-1] = 1 # Marca o último dia como feito o treino
+
     elif mode=="addTreino":
         user["listWs"].append(novoTreino)
+
     elif mode[:-1]=="treino_":
         user["listWs"][int(mode[-1])-1] = novoTreino
+
     elif mode[:-1]=="delTreino_":
         del user["listWs"][int(mode[-1])-1]
+
+    elif mode[:10]=="editLoadT_":
+        user["listWs"][int(mode[10])-1]['exercises'][int(mode[-1])-1][1].append(load)
+
     response = requests.put(f"{url}/{user_id}", json=user, headers={"Content-Type": "application/json"})
 
 # Fazer uma requisição DELETE
