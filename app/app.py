@@ -22,23 +22,14 @@ def save_data(data):
     with DATA_FILE.open("w") as file:
         json.dump(data, file, indent=4)
 
-# class Config(BaseModel):
-#     numberWs: int
-#     listWs: List
-
-#     def to_dict(self):
-#         return { 
-#             "numberWs": int,
-#             "listWs": List
-#         }
-
 # Modelo de dados
 class User(BaseModel):
     id: int | None = None  # ID será gerado automaticamente
     username: str          # Nome do usuário
     password: str           
     period: int            # Há quanto tempo o usuário registra
-    calendar: List   # Dias treinados com exito
+    calendar: List         # Dias treinados com exito
+    bodyInfos: List        # Lista de informações corporais
     listWs: List           # Lista contendo os treinos do usuário
 
 # Inicializa o FastAPI

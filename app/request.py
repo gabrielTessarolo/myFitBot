@@ -16,12 +16,12 @@ def getMaxID():
 # Fazer uma requisição POST
 def createUser(name, pw):
     new_post = {"id": getMaxID()+1, "username": name, "password": pw,
-                "period": 1,  "calendar": [0], "listWs": []}
+                "period": 1,  "calendar": [0], "bodyInfos":[], "listWs": []}
     response = requests.post(url, json=new_post)
     return new_post['id']
 
 # Fazer uma requisição PUT
-def editUser(user_id, mode="addTreino", novoTreino={"day":"", "name":"", "exercises":[]}, load=0):
+def editUser(user_id, mode="addTreino", novoTreino={"day":"", "name":"", "exercises":[]}, load=0, bdInfo=[]):
     user = [post for post in getInfo() if post['id']==user_id][0] # Recupera o usuário que deve ser alterado na API a partir do selectedUser
     if mode=="attPeriod":
         # Atualiza diariamente o atributo período dos usuários.
@@ -46,6 +46,12 @@ def editUser(user_id, mode="addTreino", novoTreino={"day":"", "name":"", "exerci
 
     elif mode[:10]=="editLoadT_":
         user["listWs"][int(mode[10])-1]['exercises'][int(mode[-1])-1][1].append(load)
+    
+    elif mode=="addBodyInfo":
+        user["bodyInfos"].append(bdInfo)
+
+    elif mode[:-1]=="attBodyInfo_":
+        user["bodyInfos"][int(mode[-1])-1][1].append(bdInfo[0])
 
     response = requests.put(f"{url}/{user_id}", json=user, headers={"Content-Type": "application/json"})
 
@@ -54,7 +60,7 @@ def deleteUser(delete_name, delete_password):
     try:
         delete_user = [post for post in getInfo() if post['username']==delete_name][0]
         if delete_password == delete_user['password']:
-            delete_url = f'{url}/{delete_user['id']}'
+            delete_url = f"{url}/{delete_user['id']}"
             response = requests.delete(delete_url)
             return response.status_code
         else:
